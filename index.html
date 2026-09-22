@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система Выборов 2026</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .party-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+
+        .party-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .votes-count {
+            color: #007bff;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .btn-vote {
+            background-color: #28a745;
+            color: white;
+            width: 100%;
+            padding: 10px;
+            font-size: 1em;
+        }
+
+        .btn-vote:hover { background-color: #218838; }
+
+        .admin-toggle {
+            background-color: #6c757d;
+            color: white;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .btn-reset-game {
+            background-color: #17a2b8;
+            color: white;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .btn-reset-game:hover {
+            background-color: #138496;
+        }
+
+        .admin-panel {
+            display: none;
+            border-top: 2px dashed #dc3545;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .admin-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-add { background-color: #007bff; color: white; flex: 1; }
+        .btn-add:hover { background-color: #0069d9; }
+
+        .btn-block { background-color: #dc3545; color: white; flex: 1; }
+        .btn-block:hover { background-color: #c82333; }
+
+        /* Экран бана */
+        #ban-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            color: #ff3333;
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #ban-screen h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        #ban-screen p {
+            font-size: 1.2em;
+            color: #ccc;
+        }
+
+        .btn-apologize {
+            background-color: #ffc107;
+            color: #000;
+            font-size: 1.1em;
+            padding: 12px 25px;
+            margin-top: 25px;
+            border-radius: 8px;
+        }
+
+        .btn-apologize:hover {
+            background-color: #e0a800;
+        }
+
+        #no-money-msg {
+            display: none;
+            color: #ff6666;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Экран Бана -->
+    <div id="ban-screen">
+        <h1>ВЫ ЗАБАНЕНЫ НАВСЕГДА</h1>
+        <p>Попытка блокировки критически важной партии блокируется системой безопасности!</p>
+        <p style="margin-top: 15px; font-size: 0.9em; color: #666;">Перезагрузка страницы вам не поможет.</p>
+        
+        <button id="apologize-btn" class="btn-apologize" onclick="apologize()"></button>
+        <div id="no-money-msg">ВЫ: у меня нету больше денег</div>
+        <button class="btn-reset-game" style="margin-top: 30px; width: auto; padding: 10px 20px;" onclick="resetAllProgress()">🔄 Полный сброс (Для видео)</button>
+    </div>
+
+    <!-- Основной интерфейс -->
+    <div class="container" id="main-app">
+        <h1>Выборы 2026</h1>
+
+        <button class="admin-toggle" onclick="toggleAdmin()">⚙ Панель Администратора</button>
+        <button class="btn-reset-game" onclick="resetAllProgress()">🔄 Полный сброс (Для видео)</button>
+
+        <!-- Список партий -->
+        <div id="parties-list"></div>
+
+        <!-- Панель Администратора -->
+        <div class="admin-panel" id="admin-panel">
+            <h2 style="color: #dc3545;">Админ-панель (Управление)</h2>
+            <div id="admin-parties-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Начальный набор партий
+        const defaultParties = [
+            { id: 1, name: "Единая Россия", votes: 450 },
+            { id: 2, name: "КПРФ", votes: 120 },
+            { id: 3, name: "ЛДПР", votes: 95 },
+            { id: 4, name: "Новые Люди", votes: 80 }
+        ];
+
+        let parties = JSON.parse(JSON.stringify(defaultParties));
+
+        // Получаем счётчик заблокированных попыток
+        function getBanCount() {
+            let count = parseInt(localStorage.getItem('banCount'));
+            return isNaN(count) ? 1 : count;
+        }
+
+        // Проверка бана при загрузке страницы
+        if (localStorage.getItem('isBanned') === 'true') {
+            showBanScreen();
+        }
+
+        function showBanScreen() {
+            document.getElementById('ban-screen').style.display = 'flex';
+            document.getElementById('main-app').style.display = 'none';
+
+            let count = getBanCount();
+            let amount = count * 5000000;
+
+            const btn = document.getElementById('apologize-btn');
+            const msg = document.getElementById('no-money-msg');
+
+            if (amount >= 50000000) {
+                btn.style.display = 'none';
+                msg.style.display = 'block';
+            } else {
+                btn.style.display = 'inline-block';
+                msg.style.display = 'none';
+                btn.innerText = "Извиниться по полной и отдать " + amount.toLocaleString('ru-RU') + " денег";
+            }
+        }
+
+        // Извиниться и заплатить
+        function apologize() {
+            let count = getBanCount();
+            let amount = count * 5000000;
+
+            if (amount >= 50000000) {
+                return;
+            }
+
+            localStorage.setItem('banCount', count + 1);
+            localStorage.removeItem('isBanned');
+
+            document.getElementById('ban-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+        }
+
+        // КНОПКА ПОЛНОГО СБРОСА ДЛЯ ВИДЕО
+        function resetAllProgress() {
+            localStorage.clear();
+            parties = JSON.parse(JSON.stringify(defaultParties));
+            document.getElementById('ban-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            render();
+        }
+
+        // Отрисовка кандидатов
+        function render() {
+            const list = document.getElementById('parties-list');
+            const adminList = document.getElementById('admin-parties-list');
+            
+            list.innerHTML = '';
+            adminList.innerHTML = '';
+
+            parties.forEach(party => {
+                // Пользовательские карточки
+                list.innerHTML += `
+                    <div class="party-card">
+                        <div class="party-header">
+                            <span>` + party.name + `</span>
+                            <span class="votes-count">` + party.votes + ` голосов</span>
+                        </div>
+                        <button class="btn-vote" onclick="vote(` + party.id + `)">Проголосовать</button>
+                    </div>
+                `;
+
+                // Карточки в админке
+                adminList.innerHTML += `
+                    <div class="party-card">
+                        <div class="party-header">
+                            <span>` + party.name + `</span>
+                            <span class="votes-count">` + party.votes + ` голосов</span>
+                        </div>
+                        <div class="admin-controls">
+                            <button class="btn-add" onclick="addVotes(` + party.id + `)">+100 Голосов</button>
+                            <button class="btn-block" onclick="blockParty(` + party.id + `)">Заблокировать</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Голосование
+        function vote(id) {
+            const party = parties.find(p => p.id === id);
+            if (party) {
+                party.votes++;
+                render();
+            }
+        }
+
+        // Накрутка голосов в админке
+        function addVotes(id) {
+            const party = parties.find(p => p.id === id);
+            if (party) {
+                party.votes += 100;
+                render();
+            }
+        }
+
+        // Обработка блокировки партии
+        function blockParty(id) {
+            const party = parties.find(p => p.id === id);
+            if (!party) return;
+
+            if (party.name === "Единая Россия") {
+                triggerBan();
+            } else {
+                parties = parties.filter(p => p.id !== id);
+                render();
+            }
+        }
+
+        // Функция перманентного бана
+        function triggerBan() {
+            localStorage.setItem('isBanned', 'true');
+            showBanScreen();
+        }
+
+        // Переключение видимости админки
+        function toggleAdmin() {
+            const panel = document.getElementById('admin-panel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Первоначальный вызов
+        render();
+    </script>
+</body>
+</html>
